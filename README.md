@@ -22,22 +22,22 @@
 * Segment cell bodies using sum slices projection + median filtering + Huang thresholding + opening + dilation + holes filling + size sorting
 * Clear cell bodies in filaments mask
 * Skeletonize filaments, filter out small branches, and analyze skeleton
-* Compute filaments local thickness analysis
+* Analyze filaments local thickness
 
 ### Output
 
 **1 ZIP file:**
-* *..._nuclei.zip*: ROIs corresponding to nuclei
+* *..._nuclei.zip*: nuclei ROIs
 
 **3 TIF images:**
-* *..._filaments.tif*: filametns binary 
+* *..._filaments.tif*: filaments binary mask 
 * *..._filaments_skel.tif*: filaments skeleton
 * *..._filaments_locThk.tif*: filaments local thickness
 
 **3 CSV files:**
-* *results_global.csv*: one line per image: nuclei nb, filaments area, filaments branches nb, filaments branches total length, filaments branches mean diam, filaments junctions nb
-* *results_branches_length.csv*: one line per branch: branch length, branch starting point, branch end point
-* *results_branches_diam.csv*: one line per branch: branch diam
+* *results_global.csv*: one row per image: nuclei nb, filaments total area, filaments branches nb, filaments branches total length, filaments branches mean diam, filaments junctions nb
+* *results_branches_length.csv*: one row per branch: branch length, branch starting point position, branch end point position
+* *results_branches_diam.csv*: one row per branch: branch diam
 
 ### Dependencies
 
