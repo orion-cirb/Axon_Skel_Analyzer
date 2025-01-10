@@ -2,19 +2,20 @@
 
 * **Developed by:** Thomas & Héloïse
 * **Developed for:** Sandra
-* **Team:** Prochiantz
-* **Date:** December 2024
+* **Team:** Fuchs
+* **Date:** January 2025
 * **Software:** Fiji
 
 ### Images description
 
-**channel 1:** Nucleus (DAPI)
-**channel 2:** axons 
-**channel 3:** cell body 
+3D images taken with 63x objective on a confocal microscope.
 
-### Macros description
+3 channels:
+  1. *405:* DAPI nuclei
+  2. *561:* Tug filaments
+  3. *642:* ORF1p cell bodies
 
-**Axon_Skel_Analyzer.ijm:**
+### Macro description
 
 **channel 1:**
 * Max intensity projection and give the number of nucleus with simple analyse workflow (background substraction, median, size and circularity filtering)
@@ -25,26 +26,26 @@
 * Run Local thickness and normalize results by dividing pixel value by thickness.
 * Run skeletonize and keep only filaments bigger than 1000 pixels
 
-### Output 
+### Output
 
-**5 images:**
+**1 *zip* file:**
+* ROIs corresponding to nuclei
+
+**3 *tif* images:**
 * mask_labeled-skeleton: mask of all filaments bigger than 1000 pixels
 * mask_LocThk: mask of the Local Thickness in all the detected axons
 * mask_nucleus: mask and label of segmented nucleus
 * mask_tagged_skeleton: skeleton over 1000 pixels with junctions and end-points
 * skeleton_locThk: skeleton with the local thickness values
 
-**2 csv files:**
+**3 *csv* files:**
 * results_Branches: all informations corresponding o the branches
 * results_Thickness: all thickness value normalized and nucleus number but also axons area
 
-**1 zip file:**
-* Roi corresponding to nucleus
-
 ### Dependencies
 
-**Axon_Skel_Analyzer.ijm:** Fiji: up to date
+None
 
 ### Version history
 
-Version 1.0 released on December 11, 2024.
+Version 1 released on January 10, 2025.
