@@ -17,30 +17,27 @@
 
 ### Macro description
 
-**channel 1:**
-* Max intensity projection and give the number of nucleus with simple analyse workflow (background substraction, median, size and circularity filtering)
-**channel 3:**
-* Sum slices and detect the body cell and remove it (background substraction, median, post processing(Open and Dilate), size filtering)
-**channel 2:**
-* Max intensity projection, preprocessing, 2 Tubeness Filters (based on DoG) one small to keep small axon and one bigger to keep bigger axon. Concatenate both images, max intensity projection, Huang threshold.
-* Run Local thickness and normalize results by dividing pixel value by thickness.
-* Run skeletonize and keep only filaments bigger than 1000 pixels
+* Segment nuclei using max intensity projection + background subtraction + median filtering + Huang thresholding + holes filling + watershed splitting + size and circularity sorting
+* Segment filaments using max intensity projection + background subtraction + median filtering + Huang thresholding + median filtering closing + holes filling + size sorting
+* Segment cell bodies using sum slices projection + median filtering + Huang thresholding + opening + dilation + holes filling + size sorting
+* Clear cell bodies in filaments mask
+* Skeletonize filaments, filter out small branches, and analyze skeleton
+* Compute filaments local thickness analysis
 
 ### Output
 
-**1 *zip* file:**
-* ROIs corresponding to nuclei
+**1 ZIP file:**
+* *..._nuclei.zip*: ROIs corresponding to nuclei
 
-**3 *tif* images:**
-* mask_labeled-skeleton: mask of all filaments bigger than 1000 pixels
-* mask_LocThk: mask of the Local Thickness in all the detected axons
-* mask_nucleus: mask and label of segmented nucleus
-* mask_tagged_skeleton: skeleton over 1000 pixels with junctions and end-points
-* skeleton_locThk: skeleton with the local thickness values
+**3 TIF images:**
+* *..._filaments.tif*: filametns binary 
+* *..._filaments_skel.tif*: filaments skeleton
+* *..._filaments_locThk.tif*: filaments local thickness
 
-**3 *csv* files:**
-* results_Branches: all informations corresponding o the branches
-* results_Thickness: all thickness value normalized and nucleus number but also axons area
+**3 CSV files:**
+* *results_global.csv*: one line per image: nuclei nb, filaments area, filaments branches nb, filaments branches total length, filaments branches mean diam, filaments junctions nb
+* *results_branches_length.csv*: one line per branch: branch length, branch starting point, branch end point
+* *results_branches_diam.csv*: one line per branch: branch diam
 
 ### Dependencies
 
