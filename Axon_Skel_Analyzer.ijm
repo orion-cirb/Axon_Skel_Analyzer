@@ -1,245 +1,271 @@
-/////////////////////////////////////////////////////////////////
-//      Authors Thomas Caille & Héloïse Monnet @ ORION-CIRB    //
-//       https://github.com/orion-cirb/MorphOocyte_Nuclei      //
-/////////////////////////////////////////////////////////////////
+/*
+ * Description: Segment nuclei and filaments, perform skeleton and local thickness analysis of filaments
+ * Developed for: Sandra, Fuchs' team
+ * Author: Thomas Caille & Héloïse Monnet @ ORION-CIRB 
+ * Date: January 2025
+ * Repository: https://github.com/orion-cirb/Axon_Skel_Analyzer
+ * Dependencies: None
+*/
 
+
+
+// Hide images during macro execution
+setBatchMode(true);
 
 // Ask for the images directory
 inputDir = getDirectory("Please select a directory containing images to analyze");
+print("Analysis started");
 
 // Create results directory
 getDateAndTime(year, month, dayOfWeek, dayOfMonth, hour, minute, second, msec);
-//resultDir = inputDir + "Results_" + year + "-" + (month+1) + "-" + dayOfMonth + "_" + hour + "-" + minute + "-" + second + File.separator();
-resultDir = inputDir + "Results" + File.separator();
+resultDir = inputDir + "Results_" + year + "-" + (month+1) + "-" + dayOfMonth + "_" + hour + "-" + minute + "-" + second + File.separator();
 if (!File.isDirectory(resultDir)) {
 	File.makeDirectory(resultDir);
 }
 
-
 // Get all files in the input directory
 inputFiles = getFileList(inputDir);
 
+// Create global/branches_length/branches_diam results files and write headers in them
+fileResultsGlobal = File.open(resultDir + "results_global.csv");
+print(fileResultsGlobal, "Image name,Nuclei nb,Filaments total area (µm2),Filaments branches nb,Filaments branches total length (µm),Filaments branches mean diam (µm),Filaments junctions nb\n");
+File.close(fileResultsGlobal);
+fileResultsBranchesLength = File.open(resultDir + "results_branches_length.csv");
+print(fileResultsBranchesLength, "Image name,Branch length (µm),V1 x,V1 y,V2 x,V2 y\n");
+File.close(fileResultsBranchesLength);
+fileResultsBranchesDiam = File.open(resultDir + "results_branches_diam.csv");
+print(fileResultsBranchesDiam, "Image name,Branch mean diam (µm)\n");
+File.close(fileResultsBranchesDiam);
 
-
-
-// Create a file named "results.csv" and write headers in it
-
-
-// Loop through all files with .TIF extension
-for (i = 5; i < inputFiles.length; i++) {
+// Loop through all files with .nd extension
+for (i = 0; i < inputFiles.length; i++) {
     if (endsWith(inputFiles[i], ".nd")) {
-    	// get the file name
-    	nameNoExt = substring(inputFiles[i],0,lengthOf(inputFiles[i])-3);
-    	// create the final result folder for each image
-		nameResultDir = inputDir + "Results" + File.separator()+ nameNoExt +File.separator ;
-		if (!File.isDirectory(nameResultDir)) {
-			File.makeDirectory(nameResultDir);
-		}
-    	fileResults = File.open(nameResultDir+ "results_Thickness.csv");
-		print(fileResults, "Nucleus_Nb,Thickness,Count,Area_axon\n");
-		// open the first channel and count the number of nucleus
+    	print("Analyzing image " + inputFiles[i] + "...");
+    	imgName = replace(inputFiles[i],".nd","");
+		
+		// Open DAPI nuclei channel (channel 1)
 		run("Bio-Formats Importer", "open=["+inputDir + inputFiles[i]+"] autoscale color_mode=Default specify_range split_channels view=Hyperstack stack_order=XYCZT c_begin=1 c_end=1 c_step=1");
-    	rename("nucleus_number");
-    	slices = nSlices;
+    	// Perform max intensity z-projection
     	run("Z Project...", "projection=[Max Intensity]");
+    	
+    	// Detect and count nuclei
+    	// Preprocessing
     	getStatistics(area,mean,min,max,std,histogram);
-    	// substract the background
-		run("Subtract...", "value="+mean+(std/2));
+		run("Subtract...", "value=" + (mean + std/2));
 		run("Median...", "radius=10");
+		// Huang thresholding
 		setAutoThreshold("Huang dark");
 		setOption("BlackBackground", true);
 		run("Convert to Mask");
+		// Postprocessing
 		run("Fill Holes");
 		run("Watershed");
-		// count only particles larger than 2000 pixels and 0.70 circularity
-    	run("Analyze Particles...", "size=2000-Infinity circularity=0.70-1.00 pixel clear add");
-    	// save the image and the associated ROIs
-    	saveAs("Tiff", nameResultDir + "mask_nucleus");
-    	roiManager("Save", nameResultDir + "Roi_nucleus.zip");
-		// print into the "results_thickness" file the number of nucleus found (1st line)
-    	print(fileResults  , nResults+",,");
+		// Filter out nuclei with area < 40 µm2 and circularity < 0.7
+		run("Set Measurements...", "redirect=None decimal=2");
+    	run("Analyze Particles...", "size=40-Infinity circularity=0.70-1.00 clear add");
+    	nbNuclei = nResults;
+    	// Save ROIs
+    	roiManager("Save", resultDir + imgName + "_nuclei.zip");
+    	roiManager("reset");
+    	close("*");
 		
-    	// open the channel 2 and do a max intensity projection
+    	// Open Tug filaments channel (channel 2)
     	run("Bio-Formats Importer", "open=["+inputDir + inputFiles[i]+"] autoscale color_mode=Default specify_range split_channels view=Hyperstack stack_order=XYCZT c_begin=2 c_end=2 c_step=1");
+    	// Perform max intensity z-projection
     	run("Z Project...", "projection=[Max Intensity]");
-    	rename("Zsum_ves");
-    	// open the channel 3 and sum the slices, the channel 3 will be use to delete the nucleus from the image 
-    	run("Bio-Formats Importer", "open=["+inputDir + inputFiles[i]+"] autoscale color_mode=Default specify_range split_channels view=Hyperstack stack_order=XYCZT c_begin=3 c_end=3 c_step=1");
-    	rename("rawImage");
-
-    	run("Z Project...", "projection=[Sum Slices]");
-    	run("Set Measurements...", "mean standard redirect=None decimal=0");
-		List.setMeasurements;
 		
-		// get the 3rd quartile bgnoise of the 3 channel
-		mean = List.getValue("Mean");
-		stdDev = List.getValue("StdDev");
-		bgNoise = (mean + stdDev) / nSlices;
-		List.clear();
-		// Remove background noise
-		run("Subtract...", "value=" + bgNoise +" stack");
-		// apply a big median filter to smooth the image without smoothing edges
-		run("Median...", "radius=15");
-		// otsu threshold to the channel 3
-		setAutoThreshold("Otsu dark");
+		// Segment filaments
+		// Preprocessing
+		run("Subtract Background...", "rolling=50 sliding");
+		run("Median...", "radius=2");
+  		// Huang thresholding
+		setAutoThreshold("Huang dark");
 		setOption("BlackBackground", true);
 		run("Convert to Mask");
-		// some post precessing opérations allowing a better segmentation of the nucleus
-		run("Options...", "iterations=15 count=1 black do=Open");
+		// Postprocessing
+		run("Options...", "iterations=4 count=1 black pad do=Close");
+		run("Median...", "radius=2");
+		// Fill holes with area < 10 µm2
+		fillHoles(0, 10);
+		rename("filamentsMask");
+		close("\\Others");
+		
+		// Open ORF1p cell bodies channel (channel 3)
+    	run("Bio-Formats Importer", "open=["+inputDir + inputFiles[i]+"] autoscale color_mode=Default specify_range split_channels view=Hyperstack stack_order=XYCZT c_begin=3 c_end=3 c_step=1");
+    	nbSlices = nSlices;
+		// Perform sum slices z-projection
+    	run("Z Project...", "projection=[Sum Slices]");
+    	
+    	// Segment cell bodies
+		// Preprocessing
+		run("Median...", "radius=50");
+		// Huang thresholding
+		setAutoThreshold("Huang dark");
+		setOption("BlackBackground", true);
+		run("Convert to Mask");
+		// Postprocessing
+		run("Options...", "iterations=20 count=1 black do=Open");
 		run("Options...", "iterations=5 count=1 black do=Dilate");
 		run("Fill Holes");
-		// get all the cell body, combine them and add them to selection
-		run("Analyze Particles...", "size=18000-Infinity pixel clear add");
-		roiManager("Combine");
-
-		run("Add Selection...");		
-		
-		// go back to the channel 2 and delete the previou cell body selection 
-		selectImage("Zsum_ves");
+		// Filter out cell bodies with area < 200 µm2
+		run("Analyze Particles...", "size=200-Infinity show=Masks");
+		run("Invert LUT");
+	
+		// Clear cell bodies in filaments mask
+		run("Create Selection");
+		selectImage("filamentsMask");
 		run("Restore Selection");
 		setBackgroundColor(0, 0, 0);
 		run("Clear", "slice");
 		run("Select None");
-		// do some preprocessing step to have a better segmentation 
-		selectImage("Zsum_ves");
-		run("Subtract Background...", "rolling=50");
-		run("Median...", "radius=2");
-		// use a small tubeness filter to keep only small axon
-		run("Tubeness", "sigma=2");
-		rename("tub_small");
-		selectImage("Zsum_ves");
-		// use a bigger one to keep big axon
-		run("Tubeness", "sigma=10");
-		rename("tub_big");
-		// concatenate both image 
-		run("Concatenate...", "keep image1=[tub_small] image2=[tub_big] image3=[-- None --]");
-		run("Z Project...", "projection=[Max Intensity]");
-		run("Set Measurements...", "area mean standard limit redirect=None decimal=0");
-		
-  		//threshold the new image 
-		setAutoThreshold("Huang dark");
-		setOption("BlackBackground", true);
-		run("Convert to Mask");
-		// some post-precessing allowing a better segmentation of the axon
-		run("Options...", "iterations=4 count=5 black do=Open");
-		run("Options...", "iterations=5 count=2 black do=Close");
-		rename("bin_mask");
-		// measure and register the axon area in the "results_Thickness" file (2nd line)
-		List.setMeasurements;
-		area_bin = List.getValue("Area");
-		print(fileResults  , ", , ,"+area_bin +"\n");
-		
 		close("\\Others");
 		
-		// run the local thickness analyse 
-		run("Local Thickness (complete process)", "threshold=128");
-   		// get some stats 
-		getStatistics(area, mean, min, max, std, histogram);
-		nBins=max;
-		newMax=max-1;
-		getHistogram(values, counts, nBins);
-		vabs=newArray(newMax);
-		norm=newArray(newMax);
-		// loops threw the histogram and print results in a .csv file
-		for (z=1 ; z<(newMax) ; z++){
-			vabs[z] = Math.floor(values[z]);
-		// normalize the value by the thickness
-			norm[z]= counts[z] / vabs[z];
-			
-			print(fileResults  ," ,"+ vabs[z]+","+norm[z]+"\n");
-		}
-		File.close(fileResults);
-    
-		// make a skeleton of the binary vessel image
-		selectImage("bin_mask");
-		run("Skeletonize");
-		run("Analyze Skeleton (2D/3D)", "prune=none show display");
-		
-		getStatistics(area, mean, min, max, std, histogram);
-
-		nBins=max;
-		getHistogram(values, counts, nBins);
-		
-		//only take filaments larger than 1000 to eliminate errors
-		for (j=1 ; j<nBins ; j++){
-			if (counts[j] > 1000) {
-				selectImage("bin_mask-labeled-skeletons");
-				run("Duplicate...", " ");
-				run("Manual Threshold...", "min="+values[j]+" max="+values[j]);
-				setOption("BlackBackground", true);
-				run("Convert to Mask");
-			}
-		}
-		// check the number of filaments larger than 1000 pixels and concatenate them
-		title=Image.title;
-		titleNumber=substring(title, 27);
-		titleNumber=parseFloat(titleNumber);
-		concatCommand = "" ;
-		defaultConcatCommand = "keep image1=bin_mask-labeled-skeletons-1";
-		if (titleNumber > 1) {
-			for (t = 2; t <= titleNumber; t++) {	
-				concatCommand = concatCommand + " image" + t + "=bin_mask-labeled-skeletons-"+t;	
-			}
-			endConcatCommand =defaultConcatCommand +concatCommand + " image" +(titleNumber + 1)+ "=[-- None --]";
-			run("Concatenate...", endConcatCommand);
-			run("Z Project...", "projection=[Max Intensity]");
-		} 
-		
-		// select filaments and create  a selection on the local thickness image
+		// Filter out filaments with area < 20 µm2
+		run("Analyze Particles...", "size=20-Infinity show=Masks");
+		run("Invert LUT");
+		// Save filaments mask
+		saveAs("Tiff", resultDir + imgName + "_filaments");
+		rename("filamentsMask");
+		close("\\Others");
+		// Measure filaments total area
 		run("Create Selection");
-		selectImage("bin_mask_LocThk");
-		run("Duplicate...", " ");
-		//save the local thickness image
-		saveAs("Tiff", nameResultDir + "mask_locThk");
-		run("Restore Selection");
-		setBackgroundColor(0, 0, 0);
-		run("Clear Outside");
-		
-		setMinAndMax(0, 255);
-		run("8-bit");
+		run("Set Measurements...", "area redirect=None decimal=2");
+		List.setMeasurements;
+		areaFilaments = List.getValue("Area");
 		run("Select None");
-		// save the filament selection in the local thickness image
-		saveAs("Tiff", nameResultDir + "skeleton_locThk");
-		close("\\Others");
-		run("Analyze Skeleton (2D/3D)", "prune=none show display");
+    
+		// Skeletonize filaments
+		selectImage("filamentsMask");
+		run("Duplicate...", "title=filamentsSkel");
+		run("Skeletonize");
+		// Filter out branches with area < 0.4 µm2 (length < 4 µm approximately)
+		filterBranches(0.4);
+		saveAs("Tiff", resultDir + imgName + "_filaments_skel");
+		rename("filamentsSkel");
 		
-    	// open the new result file containing the related branches results
-		fileResultsBranches = File.open(nameResultDir+ "results_Branches.csv");
-		print(fileResultsBranches, "Branches_Nb,Count,Branches_length,ID,endPoint_x,endPoint_y,junctionPoint_x,junctionPoint_y,Intensity,Junctions_Nb\n");
-		// save the mask-labeled-skeleton image
-		saveAs("Tiff", nameResultDir + "mask_labeled-skeleton");
-		selectImage("Tagged skeleton");
-		// save the mask tagged skeleton 
-		saveAs("Tiff", nameResultDir + "mask_tagged-skeleton");
-		
-		prev_Branches = 0;
-		selectWindow("Branch information");
-		// do a loop going throught and saving all the results corresponding to the banche informations
+		// Analyze skeleton
+		run("Analyze Skeleton (2D/3D)", "prune=none show");
+		nbBranches = 0;
+		nbJunctions = 0;
 		for (n = 0; n < nResults; n++) {
-			branches = getResult("# Branches", n);
-			branchingPoints = getResult("# Junctions", n);
-			// write informations about branches and branchingPoints for each skeleton found by the program 
-			print(fileResultsBranches, branches+",,,,,,,,,"+branchingPoints+"\n");
+    		nbBranches += getResult("# Branches", n);
+    		nbJunctions += getResult("# Junctions", n);
+    	}
+		lengthBranches = 0;
+		for (n = 0; n < Table.size; n++) {
 			selectWindow("Branch information");
-			// loop througth the result table and get some information about end point position and corresponding branching point position
-			for (m = prev_Branches; m < (branches+prev_Branches); m++) {
-				Branch_Length = Table.get("Branch length", m);
-				skeleton_ID = Table.get("Skeleton ID", m);
-				x1 = Table.get("V1 x", m);
-				y1 = Table.get("V1 y", m);
-				x2 = Table.get("V2 x", m);
-				y2 = Table.get("V2 y", m);
-				intensity = Table.get("average intensity (inner 3rd)", m);
-				if (Branch_Length > 0) {
-					// prevention loop, the number can be modifie to only register the information about branches > the length you enter
-					print(fileResultsBranches," ,"+(m-prev_Branches)+","+Branch_Length+","+skeleton_ID+","+x1+","+y1+","+x2+","+y2+","+intensity+"\n");
-				}
-				selectWindow("Branch information");
-			}	 
-			prev_Branches = (prev_Branches+branches);
+    		lengthBranches += Table.get("Branch length", n);
+    	}
+    	
+		// Save parameters in branches_length results file
+		selectWindow("Branch information");
+		for (n = 0; n < Table.size; n++) {
+			File.append(imgName+","+Table.get("Branch length", n)+","+Table.get("V1 x", n)+","+Table.get("V1 y", n)+","+Table.get("V2 x", n)+","+Table.get("V2 y", n), resultDir+"results_branches_length.csv");
 		}
-		File.close(fileResultsBranches);
+		close("Results");
+		close("Branch information");
+		close("Tagged skeleton");
+		
+		// Compute filaments local thickness
+		selectImage("filamentsMask");
+		run("Local Thickness (masked, calibrated, silent)");
+		setMinAndMax(0, 20);
+		saveAs("Tiff", resultDir + imgName + "_filaments_locThk");
+		rename("filamentsLocThk");
+		
+		// Get skeleton mean intensity on the local thickness image
+		selectImage("filamentsSkel");
+		run("Create Selection");
+		selectImage("filamentsLocThk");
+		run("Restore Selection");
+		run("Set Measurements...", "mean redirect=None decimal=2");
+		List.setMeasurements;
+		diamBranches = List.getValue("Mean");
+		run("Select None");
+		
+		// Save parameters in global results file
+    	File.append(imgName+","+nbNuclei+","+areaFilaments+","+nbBranches+","+lengthBranches+","+diamBranches+","+nbJunctions, resultDir+"results_global.csv");
+		
+		// Get skeleton without junctions and endpoints
+		selectImage("filamentsSkel");
+		run("Select None");
+		getSkeletonWithoutJunctions(false);
+		
+		// Save parameters in branches_diam results file
+		run("Set Measurements...", "mean redirect=[filamentsLocThk] decimal=2");
+		run("Analyze Particles...", "size=0-Infinity show=Nothing display clear add");
+		for (n = 0; n < nResults; n++) {
+			File.append(imgName+","+getResult("Mean", n), resultDir+"results_branches_diam.csv");
+		}	
+		
 		close("*");
+		close("Results");
+		roiManager("reset");
     }
 }
 
+setBatchMode(false);
+
+print("Analysis done!");
+
+
+
+/******************** UTILS ********************/
+
+function fillHoles(minHoleArea, maxHoleArea) {
+	run("Invert");
+	run("Analyze Particles...", "size=" + minHoleArea + "-" + maxHoleArea + " add");
+	run("Invert");
+	roiManager("deselect");
+	roiManager("combine");
+	setForegroundColor(255, 255, 255);
+	run("Fill", "slice");
+	roiManager("reset");
+	run("Select None");
+}
+
+
+function filterBranches(minBranchArea) {
+	skelImgName = getTitle();
+	
+	getSkeletonWithoutJunctions(true);
+	run("Set Measurements...", "area min redirect=[Tagged skeleton] decimal=2");
+	run("Analyze Particles...", "size=0-Infinity show=Nothing display clear add");
+	
+	selectWindow(skelImgName);
+	setBackgroundColor(0, 0, 0);
+	for (n = 0; n < nResults; n++) {		
+		if(getResult("Area", n) < minBranchArea && getResult("Min", n) == 30) {
+			roiManager("select", n);
+			run("Clear", "slice");
+		}
+	}
+	run("Skeletonize");
+	
+	close(skelImgName+"NoJct");
+	close("Tagged skeleton");
+	close("Results");
+	roiManager("reset");
+}
+
+
+function getSkeletonWithoutJunctions(keepTaggedSkel) {
+	outputImgName = getTitle()+"NoJct";
+	run("Duplicate...", "title="+outputImgName);
+	
+	run("Analyze Skeleton (2D/3D)", "prune=none");
+	run("Duplicate...", "title=jct");
+	setThreshold(60, 80, "raw");
+	setOption("BlackBackground", true);
+	run("Convert to Mask");
+	imageCalculator("Subtract", outputImgName, "jct");
+	
+	selectWindow(outputImgName);
+	close("jct");
+	close("Results");
+	if(!keepTaggedSkel) {
+		close("Tagged skeleton");
+	}
+}
+
+/***********************************************/
