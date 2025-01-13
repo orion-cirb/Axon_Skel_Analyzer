@@ -45,4 +45,4 @@ None
 
 ### Version history
 
-Version 1 released on January 10, 2025.
+Version 1 released on January 13, 2025.
