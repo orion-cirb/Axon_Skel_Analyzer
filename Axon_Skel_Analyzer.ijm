@@ -7,7 +7,11 @@
  * Dependencies: None
 */
 
-
+// PARAMETERS TO REVIEW BEFORE LAUNCHING MACRO //
+channelNuclei = 1;
+channelFilaments = 2;
+channelCellBodies = 3;
+////////////////////////////////////////////////
 
 // Hide images during macro execution
 setBatchMode(true);
@@ -28,7 +32,7 @@ inputFiles = getFileList(inputDir);
 
 // Create global/branches_length/branches_diam results files and write headers in them
 fileResultsGlobal = File.open(resultDir + "results_global.csv");
-print(fileResultsGlobal, "Image name,Nuclei nb,Filaments total area (µm2),Filaments branches nb,Filaments branches total length (µm),Filaments branches mean diam (µm),Filaments junctions nb\n");
+print(fileResultsGlobal, "Image name,Slices nb,Nuclei nb,Filaments total area (µm2),Filaments branches nb,Filaments branches total length (µm),Filaments branches mean diam (µm),Filaments junctions nb\n");
 File.close(fileResultsGlobal);
 fileResultsBranchesLength = File.open(resultDir + "results_branches_length.csv");
 print(fileResultsBranchesLength, "Image name,Branch length (µm),V1 x,V1 y,V2 x,V2 y\n");
@@ -44,7 +48,7 @@ for (i = 0; i < inputFiles.length; i++) {
     	imgName = replace(inputFiles[i],".nd","");
 		
 		// Open DAPI nuclei channel (channel 1)
-		run("Bio-Formats Importer", "open=["+inputDir + inputFiles[i]+"] autoscale color_mode=Default specify_range split_channels view=Hyperstack stack_order=XYCZT c_begin=1 c_end=1 c_step=1");
+		run("Bio-Formats Importer", "open=["+inputDir + inputFiles[i]+"] autoscale color_mode=Default specify_range split_channels view=Hyperstack stack_order=XYCZT c_begin="+channelNuclei+" c_end="+channelNuclei+" c_step=1");
     	// Perform max intensity z-projection
     	run("Z Project...", "projection=[Max Intensity]");
     	
@@ -70,7 +74,7 @@ for (i = 0; i < inputFiles.length; i++) {
     	close("*");
 		
     	// Open Tug filaments channel (channel 2)
-    	run("Bio-Formats Importer", "open=["+inputDir + inputFiles[i]+"] autoscale color_mode=Default specify_range split_channels view=Hyperstack stack_order=XYCZT c_begin=2 c_end=2 c_step=1");
+    	run("Bio-Formats Importer", "open=["+inputDir + inputFiles[i]+"] autoscale color_mode=Default specify_range split_channels view=Hyperstack stack_order=XYCZT c_begin="+channelFilaments+" c_end="+channelFilaments+" c_step=1");
     	// Perform max intensity z-projection
     	run("Z Project...", "projection=[Max Intensity]");
 		
@@ -91,7 +95,7 @@ for (i = 0; i < inputFiles.length; i++) {
 		close("\\Others");
 		
 		// Open ORF1p cell bodies channel (channel 3)
-    	run("Bio-Formats Importer", "open=["+inputDir + inputFiles[i]+"] autoscale color_mode=Default specify_range split_channels view=Hyperstack stack_order=XYCZT c_begin=3 c_end=3 c_step=1");
+    	run("Bio-Formats Importer", "open=["+inputDir + inputFiles[i]+"] autoscale color_mode=Default specify_range split_channels view=Hyperstack stack_order=XYCZT c_begin="+channelCellBodies+" c_end="+channelCellBodies+" c_step=1");
     	nbSlices = nSlices;
 		// Perform sum slices z-projection
     	run("Z Project...", "projection=[Sum Slices]");
@@ -108,7 +112,7 @@ for (i = 0; i < inputFiles.length; i++) {
 		run("Options...", "iterations=5 count=1 black do=Dilate");
 		run("Fill Holes");
 		// Filter out cell bodies with area < 200 µm2
-		run("Analyze Particles...", "size=200-Infinity show=Masks");
+		run("Analyze Particles...", "size=80-Infinity show=Masks");
 		run("Invert LUT");
 	
 		// Clear cell bodies in filaments mask
@@ -184,7 +188,7 @@ for (i = 0; i < inputFiles.length; i++) {
 		run("Select None");
 		
 		// Save parameters in global results file
-    	File.append(imgName+","+nbNuclei+","+areaFilaments+","+nbBranches+","+lengthBranches+","+diamBranches+","+nbJunctions, resultDir+"results_global.csv");
+    	File.append(imgName+","+nbSlices+","+nbNuclei+","+areaFilaments+","+nbBranches+","+lengthBranches+","+diamBranches+","+nbJunctions, resultDir+"results_global.csv");
 		
 		// Get skeleton without junctions and endpoints
 		selectImage("filamentsSkel");
