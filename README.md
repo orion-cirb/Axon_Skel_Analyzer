@@ -8,7 +8,7 @@
 
 ### Images description
 
-3D images taken with 63x objective on a confocal microscope.
+3D images taken with x60 or x40 objective on a confocal microscope.
 
 3 channels:
   1. *405:* DAPI nuclei
