@@ -8,11 +8,11 @@
 
 ### Images description
 
-3D images taken with x60 or x40 objective on a confocal microscope.
+3D images taken with x40 objective on a confocal microscope.
 
 3 channels:
   1. *405:* DAPI nuclei
-  2. *561:* Tug filaments
+  2. *561:* TUJ filaments
   3. *642:* ORF1p cell bodies
 
 ### Macro description
@@ -41,7 +41,7 @@
 
 ### Dependencies
 
-None
+* GDSC Fiji plugin (installable via Update Sites)
 
 ### Version history
 
