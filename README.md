@@ -49,13 +49,13 @@ GDSC Fiji plugin (installable via Update Sites)
 
 *DAPI_TAU_TUJ.ijm*: version 2 released on May 22, 2025.
 
-Adapted to another set of 3D images taken with x40 objective on a confocal microscope.
-
-3 channels:
-  1. DAPI nuclei
-  2. TAU axons
-  3. TUJ neurites
-     
-Key differences from version 1:
- - Cell bodies and axons segmented in TAU channel
- - Local thickness analysis of axons performed on TUJ channel, which labels the full thickness of neuronal processes
+>Adapted to another set of 3D images taken with x40 objective on a confocal microscope.
+>
+>3 channels:
+>  1. DAPI nuclei
+>  2. TAU axons
+>  3. TUJ neurites
+>     
+>Key differences from version 1:
+> - Cell bodies and axons segmented in TAU channel
+> - Local thickness analysis of axons performed on TUJ channel, which labels the full thickness of neuronal processes
