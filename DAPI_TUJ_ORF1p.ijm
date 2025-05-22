@@ -10,7 +10,7 @@
 // PARAMETERS TO REVIEW BEFORE LAUNCHING MACRO //
 channelNuclei = 1;
 channelFilaments = 2;
-channelCellBodies = 3;
+channelCellBodies = 4 ;
 ////////////////////////////////////////////////
 
 // Hide images during macro execution
@@ -47,10 +47,8 @@ for (i = 0; i < inputFiles.length; i++) {
     	print("Analyzing image " + inputFiles[i] + "...");
     	imgName = replace(inputFiles[i],".nd","");
 		
-		// Open DAPI nuclei channel (channel 1)
+		// Open nuclei channel
 		run("Bio-Formats Importer", "open=["+inputDir + inputFiles[i]+"] autoscale color_mode=Default specify_range split_channels view=Hyperstack stack_order=XYCZT c_begin="+channelNuclei+" c_end="+channelNuclei+" c_step=1");
-    	// Correct calibration
-    	setVoxelSize(0.1625, 0.1625, 0.5, "micron");
     	// Perform max intensity z-projection
     	run("Z Project...", "projection=[Max Intensity]");
     	
@@ -75,10 +73,8 @@ for (i = 0; i < inputFiles.length; i++) {
     	roiManager("reset");
     	close("*");
 		
-    	// Open Tug filaments channel (channel 2)
+    	// Open filaments channel
     	run("Bio-Formats Importer", "open=["+inputDir + inputFiles[i]+"] autoscale color_mode=Default specify_range split_channels view=Hyperstack stack_order=XYCZT c_begin="+channelFilaments+" c_end="+channelFilaments+" c_step=1");
-    	// Correct calibration
-    	setVoxelSize(0.1625, 0.1625, 0.5, "micron");
     	// Perform max intensity z-projection
     	run("Z Project...", "projection=[Max Intensity]");
 		
@@ -98,11 +94,9 @@ for (i = 0; i < inputFiles.length; i++) {
 		rename("filamentsMask");
 		close("\\Others");
 		
-		// Open ORF1p cell bodies channel (channel 3)
+		// Open cell bodies channel
     	run("Bio-Formats Importer", "open=["+inputDir + inputFiles[i]+"] autoscale color_mode=Default specify_range split_channels view=Hyperstack stack_order=XYCZT c_begin="+channelCellBodies+" c_end="+channelCellBodies+" c_step=1");
     	nbSlices = nSlices;
-    	// Correct calibration
-    	setVoxelSize(0.1625, 0.1625, 0.5, "micron");
 		// Perform sum slices z-projection
     	run("Z Project...", "projection=[Sum Slices]");
     	
@@ -117,7 +111,7 @@ for (i = 0; i < inputFiles.length; i++) {
 		run("Options...", "iterations=20 count=1 black do=Open");
 		run("Options...", "iterations=5 count=1 black do=Dilate");
 		run("Fill Holes");
-		// Filter out cell bodies with area < 80 µm2
+		// Filter out cell bodies with area < 200 µm2
 		run("Analyze Particles...", "size=80-Infinity show=Masks");
 		run("Invert LUT");
 	
@@ -211,10 +205,9 @@ for (i = 0; i < inputFiles.length; i++) {
 		close("*");
 		close("Results");
 		roiManager("reset");
+		close("ROI Manager");
     }
 }
-
-close("ROI Manager");
 
 setBatchMode(false);
 

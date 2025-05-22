@@ -9,8 +9,9 @@
 
 // PARAMETERS TO REVIEW BEFORE LAUNCHING MACRO //
 channelNuclei = 1;
-channelFilaments = 2;
+channelFilaments = 3;
 channelCellBodies = 3;
+channelLocThick = 2;
 ////////////////////////////////////////////////
 
 // Hide images during macro execution
@@ -47,7 +48,7 @@ for (i = 0; i < inputFiles.length; i++) {
     	print("Analyzing image " + inputFiles[i] + "...");
     	imgName = replace(inputFiles[i],".nd","");
 		
-		// Open DAPI nuclei channel (channel 1)
+		// Open nuclei channel
 		run("Bio-Formats Importer", "open=["+inputDir + inputFiles[i]+"] autoscale color_mode=Default specify_range split_channels view=Hyperstack stack_order=XYCZT c_begin="+channelNuclei+" c_end="+channelNuclei+" c_step=1");
     	// Perform max intensity z-projection
     	run("Z Project...", "projection=[Max Intensity]");
@@ -64,37 +65,35 @@ for (i = 0; i < inputFiles.length; i++) {
 		// Postprocessing
 		run("Fill Holes");
 		run("Watershed");
-		// Filter out nuclei with area < 40 µm2 and circularity < 0.7
+		// Filter out nuclei with area < 50 µm2 and circularity < 0.7
 		run("Set Measurements...", "redirect=None decimal=2");
-    	run("Analyze Particles...", "size=40-Infinity circularity=0.70-1.00 clear add");
+    	run("Analyze Particles...", "size=50-Infinity circularity=0.70-1.00 clear add");
     	nbNuclei = nResults;
     	// Save ROIs
     	roiManager("Save", resultDir + imgName + "_nuclei.zip");
     	roiManager("reset");
     	close("*");
 		
-    	// Open Tug filaments channel (channel 2)
+    	// Open filaments channel
     	run("Bio-Formats Importer", "open=["+inputDir + inputFiles[i]+"] autoscale color_mode=Default specify_range split_channels view=Hyperstack stack_order=XYCZT c_begin="+channelFilaments+" c_end="+channelFilaments+" c_step=1");
     	// Perform max intensity z-projection
     	run("Z Project...", "projection=[Max Intensity]");
 		
 		// Segment filaments
 		// Preprocessing
-		run("Subtract Background...", "rolling=50 sliding");
+        run("Difference of Gaussians", "  sigma1=10 sigma2=5");
 		run("Median...", "radius=2");
-  		// Huang thresholding
-		setAutoThreshold("Huang dark");
+		// Otsu thresholding
+		setAutoThreshold("Triangle dark");
 		setOption("BlackBackground", true);
 		run("Convert to Mask");
 		// Postprocessing
 		run("Options...", "iterations=4 count=1 black pad do=Close");
 		run("Median...", "radius=2");
-		// Fill holes with area < 10 µm2
-		fillHoles(0, 10);
 		rename("filamentsMask");
 		close("\\Others");
 		
-		// Open ORF1p cell bodies channel (channel 3)
+		// Open cell bodies channel
     	run("Bio-Formats Importer", "open=["+inputDir + inputFiles[i]+"] autoscale color_mode=Default specify_range split_channels view=Hyperstack stack_order=XYCZT c_begin="+channelCellBodies+" c_end="+channelCellBodies+" c_step=1");
     	nbSlices = nSlices;
 		// Perform sum slices z-projection
@@ -111,7 +110,7 @@ for (i = 0; i < inputFiles.length; i++) {
 		run("Options...", "iterations=20 count=1 black do=Open");
 		run("Options...", "iterations=5 count=1 black do=Dilate");
 		run("Fill Holes");
-		// Filter out cell bodies with area < 200 µm2
+		// Filter out cell bodies with area < 80 µm2
 		run("Analyze Particles...", "size=80-Infinity show=Masks");
 		run("Invert LUT");
 	
@@ -124,8 +123,8 @@ for (i = 0; i < inputFiles.length; i++) {
 		run("Select None");
 		close("\\Others");
 		
-		// Filter out filaments with area < 20 µm2
-		run("Analyze Particles...", "size=20-Infinity show=Masks");
+		// Filter out filaments with area < 30 µm2
+		run("Analyze Particles...", "size=30-Infinity show=Masks");
 		run("Invert LUT");
 		// Save filaments mask
 		saveAs("Tiff", resultDir + imgName + "_filaments");
@@ -170,8 +169,26 @@ for (i = 0; i < inputFiles.length; i++) {
 		close("Branch information");
 		close("Tagged skeleton");
 		
+		// Open Local Thickness channel
+    	run("Bio-Formats Importer", "open=["+inputDir + inputFiles[i]+"] autoscale color_mode=Default specify_range split_channels view=Hyperstack stack_order=XYCZT c_begin="+channelLocThick+" c_end="+channelLocThick+" c_step=1");
+    	// Perform max intensity z-projection
+    	run("Z Project...", "projection=[Max Intensity]");
+		
+		// Segment filaments
+		// Preprocessing
+        run("Difference of Gaussians", "  sigma1=10 sigma2=5");
+		run("Median...", "radius=2");
+  		// Huang thresholding
+		setAutoThreshold("Huang dark");
+		setOption("BlackBackground", true);
+		run("Convert to Mask");
+		// Postprocessing
+		run("Options...", "iterations=4 count=1 black pad do=Close");
+		run("Median...", "radius=2");
+		rename("locthickMask");
+		
 		// Compute filaments local thickness
-		selectImage("filamentsMask");
+		selectImage("locthickMask");
 		run("Local Thickness (masked, calibrated, silent)");
 		setMinAndMax(0, 20);
 		saveAs("Tiff", resultDir + imgName + "_filaments_locThk");
@@ -205,6 +222,7 @@ for (i = 0; i < inputFiles.length; i++) {
 		close("*");
 		close("Results");
 		roiManager("reset");
+		close("ROI Manager");
     }
 }
 
@@ -215,19 +233,6 @@ print("Analysis done!");
 
 
 /******************** UTILS ********************/
-
-function fillHoles(minHoleArea, maxHoleArea) {
-	run("Invert");
-	run("Analyze Particles...", "size=" + minHoleArea + "-" + maxHoleArea + " add");
-	run("Invert");
-	roiManager("deselect");
-	roiManager("combine");
-	setForegroundColor(255, 255, 255);
-	run("Fill", "slice");
-	roiManager("reset");
-	run("Select None");
-}
-
 
 function filterBranches(minBranchArea) {
 	skelImgName = getTitle();
